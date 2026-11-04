@@ -52,7 +52,7 @@ Google / Firebase の鍵・設定ファイルを中身で見分ける、読む�
 
 ## いまの状態と続きの候補（2026-11-04）
 
-GitHub に公開リポジトリとして出す（MIT）。コミットのメールは GitHub の noreply（このリポジトリの `user.email`）。
+GitHub に公開リポジトリとして出した（https://github.com/lancard-aikawa/KeyShelf 、MIT、2026-11-04）。コミットのメールは GitHub の noreply（このリポジトリの `user.email`）。
 既定値（保管庫 `~/KeyShelf`、リポジトリは `~/source/repos` など在るもの）に作者の手元のパスを書かない。
 作者の実際の設定は `~/.keyshelf/config.json` にある。
 
