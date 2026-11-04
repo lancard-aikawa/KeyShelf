@@ -121,7 +121,10 @@ def repo_dir_of(path: Path) -> Path | None:
 def _git_tracked(repo: Path, path: Path) -> bool | None:
     try:
         r = subprocess.run(
-            ["git", "-C", str(repo), "ls-files", "--error-unmatch", str(path.relative_to(repo))],
+            ["git", "-C", str(repo),
+             # the repository is not trusted: its .git/config could name a command for fsmonitor
+             "-c", "core.fsmonitor=false", "-c", "core.hooksPath=",
+             "ls-files", "--error-unmatch", str(path.relative_to(repo))],
             capture_output=True, timeout=10,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )

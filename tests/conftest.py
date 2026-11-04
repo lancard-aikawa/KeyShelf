@@ -10,7 +10,7 @@ from keyshelf.server import State, make_handler
 
 # Built at runtime so that no file in this repository contains a key-shaped string.
 PEM = "-----BEGIN " + "PRIVATE KEY-----\nFAKEFAKEFAKE\n-----END " + "PRIVATE KEY-----\n"
-SECRETS = ["FAKEFAKEFAKE", "GOCSPX-fakesecret", "AIzaFAKEapikey000", "1//fake-refresh"]
+SECRETS = ["FAKEFAKEFAKE", "GOCSPX-fakesecret", "AIzaFAKEapikey000", "1//fake-refresh", "fake-har-pw"]
 
 
 def sa(project, key_id, email=None):
@@ -40,7 +40,7 @@ def shelf(tmp_path, monkeypatch):
     })
     w("adc.json", {"type": "authorized_user", "client_id": "222", "client_secret": "GOCSPX-fakesecret",
                    "refresh_token": "1//fake-refresh"})
-    w("archive.json", {"log": {"entries": [{"request": {"url": "https://example.com/x"}}]}})
+    w("archive.json", {"log": {"entries": [{"request": {"url": "https://alice:fake-har-pw@example.com/x"}}]}})
     (d / "GoogleService-Info.plist").write_bytes(plistlib.dumps(
         {"PROJECT_ID": "proj-a", "BUNDLE_ID": "com.example.a", "API_KEY": "AIzaFAKEapikey000"}))
     (d / "broken.json").write_text("{not json", encoding="utf-8")

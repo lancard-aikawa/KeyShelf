@@ -12,6 +12,7 @@ import hashlib
 import json
 import plistlib
 from pathlib import Path
+from urllib.parse import urlsplit
 
 MAX_BYTES = 2 * 1024 * 1024
 
@@ -61,12 +62,36 @@ def classify_file(path: Path) -> dict:
     return info
 
 
+def _s(v):
+    """Keep a text identifier; anything else in a hand-edited file (list, dict, ...) becomes None."""
+    if isinstance(v, str):
+        return v
+    if isinstance(v, int) and not isinstance(v, bool):
+        return str(v)
+    return None
+
+
+def _strs(v) -> list[str]:
+    return [x for x in v if isinstance(x, str)] if isinstance(v, list) else []
+
+
+def _host(url) -> str:
+    """Host (and port) only: user:password@ in the URL must not reach the output."""
+    try:
+        u = urlsplit(url)
+        return (u.hostname or "") + (f":{u.port}" if u.port else "")
+    except (TypeError, ValueError, AttributeError):
+        return ""
+
+
 def _ios(d: dict) -> dict:
+    if not isinstance(d, dict):
+        return {"kind": "other", "keys": [type(d).__name__]}
     return {
         "kind": "ios",
-        "project": d.get("PROJECT_ID"),
-        "bundle": d.get("BUNDLE_ID"),
-        "sender_id": d.get("GCM_SENDER_ID"),
+        "project": _s(d.get("PROJECT_ID")),
+        "bundle": _s(d.get("BUNDLE_ID")),
+        "sender_id": _s(d.get("GCM_SENDER_ID")),
     }
 
 
@@ -77,27 +102,27 @@ def _json(d) -> dict:
     if t == "service_account":
         return {
             "kind": "service_account",
-            "project": d.get("project_id"),
-            "email": d.get("client_email"),
-            "key_id": (d.get("private_key_id") or "")[:8],
+            "project": _s(d.get("project_id")),
+            "email": _s(d.get("client_email")),
+            "key_id": (_s(d.get("private_key_id")) or "")[:8],
         }
     if t == "authorized_user":
         return {
             "kind": "authorized_user",
-            "project": d.get("quota_project_id"),
-            "client_id": d.get("client_id"),
+            "project": _s(d.get("quota_project_id")),
+            "client_id": _s(d.get("client_id")),
         }
     if "project_info" in d:
         pi = d.get("project_info") or {}
         packages = []
         for c in d.get("client") or []:
             pkg = ((c.get("client_info") or {}).get("android_client_info") or {}).get("package_name")
-            if pkg:
-                packages.append(pkg)
+            if _s(pkg):
+                packages.append(_s(pkg))
         return {
             "kind": "android",
-            "project": pi.get("project_id"),
-            "sender_id": pi.get("project_number"),
+            "project": _s(pi.get("project_id")),
+            "sender_id": _s(pi.get("project_number")),
             "packages": packages,
         }
     for k in ("web", "installed"):
@@ -105,17 +130,17 @@ def _json(d) -> dict:
             c = d[k]
             return {
                 "kind": f"oauth_{k}",
-                "project": c.get("project_id"),
-                "client_id": c.get("client_id"),
-                "redirects": list(c.get("redirect_uris") or []),
-                "origins": list(c.get("javascript_origins") or []),
+                "project": _s(c.get("project_id")),
+                "client_id": _s(c.get("client_id")),
+                "redirects": _strs(c.get("redirect_uris")),
+                "origins": _strs(c.get("javascript_origins")),
             }
     if isinstance(d.get("log"), dict) and "entries" in d["log"]:
         entries = d["log"].get("entries") or []
         hosts = []
         for e in entries:
-            url = ((e or {}).get("request") or {}).get("url") or ""
-            host = url.split("/")[2] if url.count("/") >= 2 else ""
+            req = e.get("request") if isinstance(e, dict) else None
+            host = _host(req.get("url")) if isinstance(req, dict) else ""
             if host and host not in hosts:
                 hosts.append(host)
         return {"kind": "har", "entries": len(entries), "hosts": hosts[:10]}

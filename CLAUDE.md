@@ -10,6 +10,9 @@ Google / Firebase の鍵・設定ファイルを中身で見分ける、読む�
 - **ファイルを消さない・動かさない。**「不要」は印だけ（`~/.keyshelf/notes.json`）
 - **鍵のファイルをこのリポジトリに入れない。**`.gitignore` で `*.json` と `*.plist` を外し、
   `tests/test_repo_clean.py` で確かめる。試験の偽の鍵は実行時に組み立てる（`"BEGIN " + "PRIVATE KEY"`）
+- **走査するファイルとリポジトリは信用しない。**JSON の値は文字列だけ拾う（`classify._s`。リストが来て一覧ごと落ちた）。
+  HAR の URL はホスト名だけにする（`user:pass@` が出ていた）。git は `-c core.fsmonitor=false` を付けて呼ぶ
+  （リポジトリの `.git/config` に書いたコマンドが走査で動いた）。試験は `tests/test_untrusted.py`
 - サーバは `127.0.0.1:20002`（LPortMan に登録）。`Host` の確認と、POST は `application/json` だけ、を外さない。
   `/api/reveal` は走査で見つけたパスだけを開く
 
