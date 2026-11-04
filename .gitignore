@@ -1,0 +1,10 @@
+# Credential files must never be committed here.
+*.json
+*.plist
+*.p12
+*.pem
+
+.venv/
+__pycache__/
+.pytest_cache/
+dist/

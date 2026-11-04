@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KeyShelf</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2330; --sub: #5d6676; --line: #d5dae2;
+  --accent: #2458d6; --accent-ink: #ffffff; --accent-soft: #e6edfc;
+  --high: #b3261e; --high-bg: #fde7e5; --mid: #8a5a00; --mid-bg: #fdf1d8;
+  --low: #2e6b3a; --low-bg: #e3f3e6; --unk: #555d6b; --unk-bg: #eceef2;
+  --focus: #f0a500;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15181e; --panel: #1e232b; --ink: #e6e9ef; --sub: #9aa3b2; --line: #363d49;
+    --accent: #6e9bff; --accent-ink: #0b1430; --accent-soft: #24304a;
+    --high: #ff8a80; --high-bg: #3d1f1d; --mid: #f3c26b; --mid-bg: #3a2f17;
+    --low: #8fd19e; --low-bg: #1d3323; --unk: #b4bbc8; --unk-bg: #2a2f38;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.6 "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif; }
+header { position: sticky; top: 0; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line);
+  padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+header h1 { font-size: 18px; margin: 0; }
+.folder { color: var(--sub); font-family: Consolas, monospace; font-size: 12px;
+  min-width: 0; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status { color: var(--sub); font-size: 12px; }
+.spacer { flex: 1; }
+main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+body.wide main { max-width: 1600px; }
+
+/* ---- buttons: every pressable thing has a border or fill, hover, focus and pointer ---- */
+button, a.btn { font: inherit; cursor: pointer; border-radius: 6px; padding: 4px 12px;
+  border: 1px solid var(--accent); background: var(--panel); color: var(--accent);
+  display: inline-flex; align-items: center; gap: 6px; text-decoration: none; line-height: 1.5; }
+button:hover, a.btn:hover { background: var(--accent-soft); }
+button:active, a.btn:active { transform: translateY(1px); }
+button:focus-visible, a.btn:focus-visible, textarea:focus-visible, input:focus-visible
+  { outline: 3px solid var(--focus); outline-offset: 1px; }
+button.primary { background: var(--accent); color: var(--accent-ink); }
+button.primary:hover { filter: brightness(1.1); }
+button:disabled { cursor: progress; opacity: .6; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.seg button[aria-pressed="true"], button.toggle[aria-pressed="true"]
+  { background: var(--accent); color: var(--accent-ink); }
+.ic { font-size: 13px; }
+.grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 100%; min-width: 0; }
+.grp .seg { min-width: 0; }
+.grp-name { color: var(--sub); font-size: 12px; font-weight: 600; }
+
+/* ---- flat labels (not pressable): no border, square corners ---- */
+.tag { display: inline-block; padding: 0 6px; font-size: 12px; border-radius: 0; font-weight: 600; }
+.r-high { color: var(--high); background: var(--high-bg); }
+.r-mid { color: var(--mid); background: var(--mid-bg); }
+.r-low { color: var(--low); background: var(--low-bg); }
+.r-unknown { color: var(--unk); background: var(--unk-bg); }
+
+.tools { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 12px 0 16px; }
+.tools input[type=search] { font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); color: var(--ink); min-width: 220px; }
+
+section.findings { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--mid);
+  border-radius: 6px; padding: 8px 12px; margin-bottom: 16px; }
+section.findings h2 { font-size: 15px; margin: 4px 0 8px; }
+.finding { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--line); }
+.finding:first-of-type { border-top: 0; }
+.finding .txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.findings .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.findings .bar .hint { color: var(--sub); font-size: 12px; }
+.findings .items { margin-top: 6px; }
+section.findings.danger { border-left-color: var(--high); }
+.finding button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+/* ---- folders panel ---- */
+section.folders { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+  border-radius: 6px; padding: 8px 12px; margin-bottom: 16px; }
+section.folders h2 { font-size: 15px; margin: 2px 0 8px; }
+.fgroup + .fgroup { margin-top: 14px; padding-top: 10px; border-top: 2px solid var(--line); }
+.frow { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-top: 1px solid var(--line); }
+.frow:first-of-type { border-top: 0; }
+.frow .p { flex: 1; min-width: 0; font-family: Consolas, monospace; overflow-wrap: anywhere; }
+.frow .n { color: var(--sub); font-size: 12px; white-space: nowrap; }
+.fadd { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.fadd input { flex: 1; min-width: 200px; font: inherit; font-family: Consolas, monospace; padding: 4px 8px;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
+.ferr { color: var(--high); font-size: 13px; margin-top: 6px; }
+.fnote { color: var(--sub); font-size: 12px; margin-top: 6px; }
+button[aria-expanded="true"]#btn-folders { background: var(--accent); color: var(--accent-ink); }
+
+/* shown while the list is narrowed by a finding; sticks under the header */
+.filterbar { position: sticky; top: var(--hh, 52px); z-index: 1; display: flex; align-items: center; gap: 8px;
+  background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; }
+.filterbar .txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-danger { color: var(--high); background: var(--high-bg); }
+.lv-warn { color: var(--mid); background: var(--mid-bg); }
+.lv-info { color: var(--unk); background: var(--unk-bg); }
+
+h2.proj { font-size: 15px; margin: 20px 0 8px; font-family: Consolas, monospace; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+.card.unneeded { opacity: .55; }
+.card.hit { box-shadow: 0 0 0 3px var(--focus); }
+.card .top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.card .name { font-family: Consolas, monospace; font-weight: 600; word-break: break-all; }
+.card .date { color: var(--sub); font-size: 12px; }
+.card .usage { margin: 6px 0; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0 12px; margin: 6px 0; font-size: 13px; }
+dt { color: var(--sub); }
+dd { margin: 0; font-family: Consolas, monospace; word-break: break-all; }
+.copies { margin: 6px 0; font-size: 13px; }
+.copy { display: flex; gap: 8px; align-items: center; padding: 2px 0; }
+.copy .p { font-family: Consolas, monospace; word-break: break-all; flex: 1; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; margin-top: 8px; }
+.actions textarea { flex: 1; min-width: 240px; min-height: 34px; font: inherit; padding: 4px 8px;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); resize: vertical; }
+.saved { color: var(--low); font-size: 12px; align-self: center; }
+.empty { color: var(--sub); padding: 24px; text-align: center; }
+
+/* ---- table view ---- */
+.tablewrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+th { background: var(--bg); white-space: nowrap; position: sticky; top: 0; }
+th button.sort { padding: 1px 8px; font-size: 12px; font-weight: 600; }
+th button.sort[aria-pressed="true"] { background: var(--accent-soft); }
+tr.row:hover td { background: var(--accent-soft); }
+tr.row.unneeded td { opacity: .55; }
+tr.row.hit td { box-shadow: inset 0 2px 0 var(--focus), inset 0 -2px 0 var(--focus); }
+td.mono { font-family: Consolas, monospace; }
+td.name { font-family: Consolas, monospace; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+td.ident { font-family: Consolas, monospace; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sub); }
+td.note { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sub); }
+td.num { text-align: right; white-space: nowrap; }
+td.nowrap { white-space: nowrap; }
+tr.detail > td { background: var(--bg); padding: 8px; }
+tr.detail .card { margin: 0; }
+td button { padding: 1px 8px; font-size: 12px; }
+/* narrow screens: the memo is still in the opened card */
+@media (max-width: 1360px) { th.opt, td.opt { display: none; } }
+@media (max-width: 600px) { .tools input[type=search] { min-width: 0; width: 100%; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>KeyShelf</h1>
+  <span class="folder" id="folder"></span>
+  <span class="spacer"></span>
+  <span class="status" id="status"></span>
+  <button id="btn-folders" aria-expanded="false" title="保管庫とリポジトリのフォルダの追加・削除"><span class="ic">&#x25a4;</span>フォルダ</button>
+  <button id="btn-reload" title="保管庫のフォルダを読み直す"><span class="ic">&#x21bb;</span>再読込</button>
+  <button id="btn-search" title="リポジトリ群の中の鍵を探し直す（初回は 1 分ほどかかる）"><span class="ic">&#x2315;</span>探索</button>
+</header>
+<main>
+  <section class="folders" id="folders" hidden></section>
+  <section class="findings" id="findings" hidden></section>
+  <div class="tools">
+    <div class="seg" id="views" role="group" aria-label="表示">
+      <button data-view="card" title="1 ファイルを 1 枚のカードで表示"><span class="ic">&#x25a6;</span>カード</button>
+      <button data-view="table" title="1 ファイルを 1 行で表示"><span class="ic">&#x2630;</span>表</button>
+    </div>
+    <div class="grp"><span class="grp-name">場所</span><div class="seg" id="places" role="group" aria-label="場所"></div></div>
+    <div class="grp"><span class="grp-name">種類</span><div class="seg" id="kinds" role="group" aria-label="種類"></div></div>
+    <input type="search" id="q" placeholder="絞り込み（名前・プロジェクト・パス）" aria-label="絞り込み">
+  </div>
+  <div id="list"></div>
+</main>
+<script>
+"use strict";
+const KIND_ORDER = ["管理鍵", "ログイン情報", "OAuth", "Android", "iOS", "通信記録", "その他", "読めない"];
+const RISK = { high: "危険度 高", mid: "危険度 中", low: "危険度 低", unknown: "不明" };
+let data = null, kind = "すべて", only = null, poll = null;
+let view = "card", place = "all", byId = new Map();
+const PLACES = [["all", "すべて"], ["shelf", "保管庫"], ["repo", "リポジトリ"]];
+// Not credential-shaped: hidden from "すべて", shown when their kind button is pressed.
+const KIND_HIDDEN = ["その他", "読めない"];
+try {
+  view = localStorage.getItem("keyshelf.view") === "table" ? "table" : "card";
+  const saved = localStorage.getItem("keyshelf.place") || "all";
+  place = PLACES.some(([k]) => k === saved) || /^(root|sdir):/.test(saved) ? saved : "all";
+} catch { /* storage blocked */ }
+const remember = (k, v) => { try { localStorage.setItem(k, v); } catch { /* storage blocked */ } };
+const repoName = (it) => (it.repo ? it.repo.split(/[\\/]/).pop() : "（git 外）");
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function api(path, body) {
+  const opt = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const r = await fetch(path, opt);
+  if (!r.ok) {
+    let msg = path + " " + r.status;
+    try { msg = (await r.json()).error || msg; } catch { /* not json */ }
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+function statusText() {
+  if (data.searching) return "リポジトリを探索中…";
+  const s = data.repo_scan;
+  if (!s) return "リポジトリ: 未探索";
+  return `リポジトリ: ${s.at || ""} 探索（候補 ${s.looked} 件から鍵 ${s.found} 件、${s.seconds} 秒）`;
+}
+
+function render() {
+  byId = new Map(data.items.map((it) => [it.id, it]));
+  // findings may change after a reload or a repository search
+  if (onlyFinding !== null) {
+    const f = data.findings[onlyFinding];
+    if (f) only = f.ids; else { onlyFinding = null; only = null; }
+  }
+  const more = data.shelves.length > 1 ? ` ほか ${data.shelves.length - 1}` : "";
+  $("#folder").textContent = "保管庫: " + (data.shelves[0] || "") + more;
+  $("#folder").title = data.shelves.join("\n");
+  $("#status").textContent = statusText();
+  $("#btn-search").disabled = data.searching;
+  renderFolders();
+  renderFindings();
+  renderKinds();
+  renderList();
+  if (data.searching && !poll) poll = setInterval(refresh, 3000);
+  if (!data.searching && poll) { clearInterval(poll); poll = null; }
+}
+
+let findingsOpen = false, onlyFinding = null;
+try { findingsOpen = localStorage.getItem("keyshelf.findings") === "open"; } catch { /* storage blocked */ }
+
+function renderFindings() {
+  const el = $("#findings");
+  if (!data.findings.length) { el.hidden = true; return; }
+  el.hidden = false;
+  const lv = { danger: "危険", warn: "注意", info: "整理" };
+  const n = { danger: 0, warn: 0, info: 0 };
+  data.findings.forEach((f) => n[f.level]++);
+  el.classList.toggle("danger", n.danger > 0);
+  const counts = ["danger", "warn", "info"].filter((k) => n[k])
+    .map((k) => `<span class="tag lv-${k}">${lv[k]} ${n[k]}</span>`).join("");
+  const bar = `<div class="bar">
+      <button id="btn-findings" aria-expanded="${findingsOpen}" title="${findingsOpen ? "注意を畳む" : "注意を開く"}">
+        <span class="ic">${findingsOpen ? "&#x25be;" : "&#x25b8;"}</span>注意 ${data.findings.length}</button>
+      ${counts}
+    </div>`;
+  const items = findingsOpen ? '<div class="items">' + data.findings.map((f, i) => `
+    <div class="finding">
+      <span class="tag lv-${f.level}">${lv[f.level]}</span>
+      <div class="txt" title="${esc(f.title + " " + f.text)}"><b>${esc(f.title)}</b> ${esc(f.text)}</div>
+      <button data-finding="${i}" aria-pressed="${onlyFinding === i}" title="${onlyFinding === i ? "絞り込みを解除" : "この注意に当たるファイルだけを表示"}"><span class="ic">&#x25b8;</span>表示</button>
+    </div>`).join("") + "</div>" : "";
+  el.innerHTML = bar + items;
+}
+
+const normDir = (p) => p.toLowerCase().replace(/\//g, "\\").replace(/\\+$/, "");
+const under = (path, root) => normDir(path).startsWith(normDir(root) + "\\");
+// place: "all" | "shelf" | "repo" | "sdir:<one shelf>" | "root:<one repository folder>"
+const inPlace = (it) => {
+  if (place === "all") return true;
+  if (place.startsWith("sdir:")) return it.place === "shelf" && under(it.path, place.slice(5));
+  if (place.startsWith("root:")) return it.place === "repo" && under(it.path, place.slice(5));
+  return it.place === place;
+};
+const shortDir = (p) => (p.length <= 24 ? p : "…\\" + p.split(/[\\/]/).filter(Boolean).pop());
+const visible = (it) => !KIND_HIDDEN.includes(it.label);
+
+function renderPlaces() {
+  // a folder that was removed can no longer be the filter
+  const has = (list, p) => list.some((r) => normDir(r) === normDir(p));
+  if (place.startsWith("root:") && !has(data.roots, place.slice(5))) place = "all";
+  if (place.startsWith("sdir:") && !has(data.shelves, place.slice(5))) place = "all";
+  const n = { all: 0, shelf: 0, repo: 0 };
+  data.items.filter(visible).forEach((it) => { n.all++; n[it.place]++; });
+  const tips = { all: "保管庫とリポジトリの両方", shelf: "保管庫のファイルだけ", repo: "リポジトリ群の中で見つけた鍵だけ" };
+  const btn = (k, label, count, tip) =>
+    `<button aria-pressed="${k === place}" data-place="${esc(k)}" title="${esc(tip)}">${esc(label)} ${count}</button>`;
+  const out = PLACES.map(([k, name]) => btn(k, name, n[k], tips[k]));
+  const count = (pl, dir) => data.items.filter((it) => it.place === pl && visible(it) && under(it.path, dir)).length;
+  if (data.shelves.length > 1) data.shelves.forEach((s) => out.push(btn("sdir:" + s, shortDir(s), count("shelf", s), `保管庫 ${s} のファイルだけ`)));
+  if (data.roots.length > 1) data.roots.forEach((r) => out.push(btn("root:" + r, shortDir(r), count("repo", r), `${r} の中で見つけた鍵だけ`)));
+  $("#places").innerHTML = out.join("");
+}
+
+// ---- folders panel: shelves (保管庫) and repository folders ----
+let foldersOpen = false;
+const folderError = { shelf: "", repo: "" };
+const FOLDER_KINDS = [
+  { kind: "shelf", name: "保管庫", list: () => data.shelves, counts: () => data.shelf_counts, unit: "ファイル",
+    hint: "例: D:\\keys", addTip: "ダウンロードした鍵を置くフォルダとして加える（サブフォルダも読む）",
+    removeTip: "保管庫から外す（フォルダの中のファイルは消さない）" },
+  { kind: "repo", name: "リポジトリ", list: () => data.roots, counts: () => data.root_counts, unit: "鍵",
+    hint: "例: D:\\Repos", addTip: "このフォルダの下を探す対象に加える",
+    removeTip: "探す対象から外す（フォルダの中のファイルは消さない）" },
+];
+
+function renderFolders() {
+  const el = $("#folders");
+  $("#btn-folders").setAttribute("aria-expanded", foldersOpen);
+  el.hidden = !foldersOpen;
+  if (!foldersOpen) return;
+  // keep what is being typed across a re-render (a refresh may come in at any time)
+  const typed = {}, focused = document.activeElement?.id;
+  el.querySelectorAll(".folder-input").forEach((i) => typed[i.id] = i.value);
+  el.innerHTML = FOLDER_KINDS.map((f) => {
+    const list = f.list();
+    const lastShelf = f.kind === "shelf" && list.length <= 1;
+    const rows = list.map((p) => `
+      <div class="frow">
+        <span class="p">${esc(p)}</span>
+        <span class="n">${f.unit} ${f.counts()[p] ?? 0}</span>
+        <button data-folder-remove="${esc(p)}" data-fkind="${f.kind}" ${lastShelf ? "disabled" : ""}
+          title="${lastShelf ? "保管庫は 1 つ以上要る" : f.removeTip}"><span class="ic">&#x2715;</span>削除</button>
+      </div>`).join("") || '<div class="frow"><span class="n">なし</span></div>';
+    return `
+    <div class="fgroup">
+      <h2>${f.name}</h2>
+      ${rows}
+      <div class="fadd">
+        <input id="${f.kind}-input" data-fkind="${f.kind}" class="folder-input" type="text" placeholder="${esc(f.hint)}"
+          aria-label="${f.name}に追加するフォルダのパス" spellcheck="false">
+        <button class="primary" data-folder-add="${f.kind}" title="${f.addTip}"><span class="ic">&#xff0b;</span>追加</button>
+      </div>
+      ${folderError[f.kind] ? `<div class="ferr" role="alert">${esc(folderError[f.kind])}</div>` : ""}
+    </div>`;
+  }).join("") + `<div class="fnote">保存先: ${esc("%USERPROFILE%\\.keyshelf\\config.json")}</div>`;
+  Object.entries(typed).forEach(([id, v]) => { const i = document.getElementById(id); if (i) i.value = v; });
+  if (focused && typed[focused] !== undefined) document.getElementById(focused)?.focus();
+}
+
+async function changeFolder(kind, action, path) {
+  try {
+    data = await api("/api/folders", { kind, action, path });
+    folderError[kind] = "";
+  } catch (err) {
+    folderError[kind] = err.message;
+  }
+  render();
+  const i = $(`#${kind}-input`);
+  if (!i) return;
+  if (folderError[kind]) { i.value = path; i.focus(); }
+  else if (action === "add") i.value = "";
+}
+
+function renderKinds() {
+  renderPlaces();
+  const counts = {};
+  const pool = data.items.filter(inPlace);
+  pool.forEach((it) => counts[it.label] = (counts[it.label] || 0) + 1);
+  const labels = ["すべて", ...KIND_ORDER.filter((k) => counts[k])];
+  if (!labels.includes(kind)) kind = "すべて";
+  $("#kinds").innerHTML = labels.map((k) => {
+    const n = k === "すべて" ? pool.filter(visible).length : counts[k];
+    const tip = k === "すべて" ? "鍵の形をしたもの全部（その他・読めないは除く）" : "";
+    return `<button aria-pressed="${k === kind}" data-kind="${esc(k)}" title="${tip}">${esc(k)} ${n}</button>`;
+  }).join("");
+}
+
+function matches(it) {
+  if (only && !only.includes(it.id)) return false;
+  if (!only && !inPlace(it)) return false;
+  if (kind === "すべて" && !only && !visible(it)) return false;
+  if (kind !== "すべて" && it.label !== kind) return false;
+  const q = $("#q").value.trim().toLowerCase();
+  if (!q) return true;
+  const hay = [it.name, it.path, it.project, it.email, it.bundle, it.client_id, ...(it.packages || []), ...(it.redirects || []), it.mark.note]
+    .join(" ").toLowerCase();
+  return hay.includes(q);
+}
+
+// Where the file is and how it relates to the other place.
+function placeTags(it) {
+  if (it.place === "shelf") return '<span class="tag r-unknown">保管庫</span>';
+  return `<span class="tag r-unknown">リポジトリ</span>${it.tracked ? ' <span class="tag r-high">git 管理</span>' : ""}`;
+}
+
+// Name shown for a file: path inside its shelf / repository.
+function shownName(it) {
+  if (it.place === "repo") return (it.repo ? repoName(it) + "\\" : "") + it.rel;
+  return (data.shelves.length > 1 ? shortDir(it.shelf) + "\\" : "") + (it.rel || it.name);
+}
+
+function relation(it) {
+  if (it.place === "shelf") return "";
+  if (!it.shelf_ids.length) return `<div class="copies"><span class="tag ${it.risk === "high" ? "lv-warn" : "r-unknown"}">未保管</span></div>`;
+  return `<div class="copies"><b>保管済み（${esc(it.how)}）</b>` + it.shelf_ids.map((id) => {
+    const s = byId.get(id);
+    return s ? `<div class="copy"><span class="p">${esc(shownName(s))}</span>
+      <button data-reveal="${s.id}" title="エクスプローラで保管庫のファイルを開く"><span class="ic">&#x1f4c2;&#xfe0e;</span>場所</button></div>` : "";
+  }).join("") + "</div>";
+}
+
+function details(it) {
+  const rows = [];
+  const add = (k, v) => { if (v && (!Array.isArray(v) || v.length)) rows.push(`<dt>${k}</dt><dd>${esc(Array.isArray(v) ? v.join("\n") : v).replace(/\n/g, "<br>")}</dd>`); };
+  add("アカウント", it.email);
+  add("鍵 ID", it.key_id && it.key_id + "…");
+  add("パッケージ", it.packages);
+  add("バンドル ID", it.bundle);
+  add("client_id", it.client_id);
+  add("戻り先", it.redirects);
+  add("JS の元", it.origins);
+  add("送信者 ID", it.sender_id);
+  add("中身の SHA-256", it.sha256.slice(0, 16) + "…");
+  return rows.length ? `<dl>${rows.join("")}</dl>` : "";
+}
+
+function copiesHtml(it) {
+  if (it.place !== "shelf" || !it.copies.length) return "";
+  return `<div class="copies"><b>リポジトリの写し ${it.copies.length}</b>` + it.copies.map((c) => `
+    <div class="copy">
+      <span class="tag r-unknown">${esc(c.how)}</span>
+      ${c.tracked ? '<span class="tag r-high">git 管理</span>' : ""}
+      <span class="p">${esc(c.path)}</span>
+      <button data-reveal="${c.id}" title="エクスプローラで場所を開く"><span class="ic">&#x1f4c2;&#xfe0e;</span>場所</button>
+    </div>`).join("") + "</div>";
+}
+
+function consoleLink(it) {
+  if (it.kind !== "service_account" || !it.project) return "";
+  const u = "https://console.cloud.google.com/iam-admin/serviceaccounts?project=" + encodeURIComponent(it.project);
+  return `<a class="btn" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="Google Cloud のコンソールで鍵の一覧を開く（ブラウザ）"><span class="ic">&#x2197;</span>コンソール</a>`;
+}
+
+function card(it) {
+  return `
+  <div class="card ${it.mark.unneeded ? "unneeded" : ""} ${only && only.includes(it.id) ? "hit" : ""}" data-id="${it.id}">
+    <div class="top">
+      <span class="tag r-${it.risk}">${esc(it.label)}</span>
+      <span class="tag r-${it.risk}">${RISK[it.risk]}</span>
+      ${placeTags(it)}
+      ${it.mark.unneeded ? '<span class="tag r-unknown">不要</span>' : ""}
+      <span class="name">${esc(shownName(it))}</span>
+      <span class="date">${esc(it.mtime)}</span>
+    </div>
+    <div class="usage">${esc(it.usage)}</div>
+    ${details(it)}
+    ${copiesHtml(it)}
+    ${relation(it)}
+    <div class="actions">
+      <textarea data-note="${it.id}" placeholder="メモ（どのアプリで使うか、誰から受け取ったか）" aria-label="メモ">${esc(it.mark.note)}</textarea>
+      <button class="primary" data-save="${it.id}" title="メモを保存"><span class="ic">&#x2713;</span>保存</button>
+      <button class="toggle" aria-pressed="${it.mark.unneeded}" data-unneeded="${it.id}" title="不要の印を付ける / 外す（ファイルは消さない）"><span class="ic">&#x2716;</span>不要</button>
+      <button data-reveal="${it.id}" title="エクスプローラで場所を開く"><span class="ic">&#x1f4c2;&#xfe0e;</span>場所</button>
+      ${consoleLink(it)}
+    </div>
+  </div>`;
+}
+
+// ---- table view ----
+const SHORT = {
+  service_account: "サーバ用の管理鍵", authorized_user: "ログインした人の資格情報",
+  oauth_web: "Google ログイン（ウェブ）", oauth_installed: "Google ログイン（デスクトップ）",
+  android: "Android アプリの設定", ios: "iOS アプリの設定", har: "ブラウザの通信の記録",
+  other: "鍵の形ではない", error: "読めない",
+};
+const RISK_RANK = { high: 0, mid: 1, low: 2, unknown: 3 };
+const COLS = [
+  { key: "kind", name: "種類", val: (it) => RISK_RANK[it.risk] * 100 + KIND_ORDER.indexOf(it.label) },
+  { key: "place", name: "場所", val: (it) => (it.place === "shelf" ? "\u0000" + it.shelf.toLowerCase() : repoName(it).toLowerCase()) },
+  { key: "project", name: "プロジェクト", val: (it) => it.project || "￿" },
+  { key: "name", name: "ファイル", val: (it) => (it.rel || it.name).toLowerCase() },
+  { key: "use", name: "使い道", val: (it) => SHORT[it.kind] || "" },
+  { key: "ident", name: "識別", val: (it) => ident(it) },
+  { key: "rel", name: "対応", val: (it) => (it.place === "shelf"
+      ? -(it.copies.length * 10 + it.copies.filter((c) => c.tracked).length)
+      : (it.shelf_ids.length ? 1000 : 500)) },
+  { key: "mtime", name: "取得日", val: (it) => it.mtime },
+  { key: "note", name: "メモ", cls: "opt", val: (it) => (it.mark.unneeded ? "0" : "1") + (it.mark.note || "￿") },
+];
+let sortKey = "project", sortDir = 1;
+const opened = new Set();
+
+function ident(it) {
+  if (it.kind === "service_account") return `${(it.email || "").split("@")[0]} / ${it.key_id}`;
+  if (it.kind === "android") return (it.packages || []).join(", ");
+  if (it.kind === "ios") return it.bundle || "";
+  if (it.kind.startsWith("oauth_")) {
+    const r = it.redirects || [];
+    const hosts = [...new Set(r.map((u) => { try { return new URL(u).host; } catch { return u; } }))];
+    return hosts.length ? `戻り先 ${hosts.join(", ")}` : (it.client_id || "").slice(0, 24);
+  }
+  if (it.kind === "har") return (it.hosts || []).join(", ");
+  return "";
+}
+
+function renderTable(items) {
+  const col = COLS.find((c) => c.key === sortKey);
+  const tie = (a, b) => (a.project || "￿").localeCompare(b.project || "￿") || a.name.localeCompare(b.name);
+  items = [...items].sort((a, b) => {
+    const x = col.val(a), y = col.val(b);
+    return (x < y ? -1 : x > y ? 1 : 0) * sortDir || tie(a, b);
+  });
+  const head = COLS.map((c) => {
+    const on = c.key === sortKey;
+    const arrow = on ? (sortDir > 0 ? "&#x25b2;" : "&#x25bc;") : "&#x21c5;";
+    return `<th class="${c.cls || ""}"><button class="sort" data-sort="${c.key}" aria-pressed="${on}" title="${c.name}で並べ替え">${c.name} <span class="ic">${arrow}</span></button></th>`;
+  }).join("");
+  const relCell = (it) => {
+    if (it.place === "shelf") {
+      const git = it.copies.some((c) => c.tracked) ? ' <span class="tag r-high">git</span>' : "";
+      return it.copies.length ? `写し ${it.copies.length}${git}` : "";
+    }
+    return it.shelf_ids.length ? '<span class="tag r-unknown">保管済み</span>'
+      : `<span class="tag ${it.risk === "high" ? "lv-warn" : "r-unknown"}">未保管</span>`;
+  };
+  const placeCell = (it) => (it.place === "shelf"
+    ? `<span class="tag r-unknown" title="${esc(it.shelf)}">保管庫</span>${data.shelves.length > 1 ? " " + esc(shortDir(it.shelf)) : ""}`
+    : `<span title="${esc(it.repo || it.path)}">${esc(repoName(it))}</span>${it.tracked ? ' <span class="tag r-high">git</span>' : ""}`);
+  const rows = items.map((it) => {
+    const note = it.mark.note ? esc(it.mark.note) : "";
+    const isOpen = opened.has(it.id);
+    const row = `
+    <tr class="row ${it.mark.unneeded ? "unneeded" : ""} ${only && only.includes(it.id) ? "hit" : ""}">
+      <td class="nowrap"><button data-detail="${it.id}" aria-expanded="${isOpen}" title="カードを開いて全項目・メモ・写しを表示">
+        <span class="ic">${isOpen ? "&#x25be;" : "&#x25b8;"}</span>詳細</button></td>
+      <td class="nowrap"><span class="tag r-${it.risk}" title="${RISK[it.risk]}">${esc(it.label)}</span></td>
+      <td class="nowrap">${placeCell(it)}</td>
+      <td class="mono nowrap">${esc(it.project || "-")}</td>
+      <td class="name" title="${esc(it.path)}">${esc(it.rel || it.name)}</td>
+      <td class="nowrap">${esc(SHORT[it.kind] || "")}</td>
+      <td class="ident" title="${esc(ident(it))}">${esc(ident(it))}</td>
+      <td class="nowrap">${relCell(it)}</td>
+      <td class="mono nowrap">${esc(it.mtime)}</td>
+      <td class="note opt" title="${note}">${it.mark.unneeded ? '<span class="tag r-unknown">不要</span> ' : ""}${note}</td>
+    </tr>`;
+    return row + (isOpen ? `<tr class="detail"><td colspan="${COLS.length + 1}">${card(it)}</td></tr>` : "");
+  }).join("");
+  $("#list").innerHTML = `<div class="tablewrap"><table><thead><tr><th></th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function renderViews() {
+  document.body.classList.toggle("wide", view === "table");
+  document.querySelectorAll("#views button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.view === view));
+}
+
+function filterBar(n) {
+  if (!only) return "";
+  const f = data.findings[onlyFinding];
+  const what = f ? `${f.title}` : "注意";
+  return `<div class="filterbar" role="status">
+    <span class="tag lv-${f ? f.level : "info"}">絞込</span>
+    <span class="txt" title="${esc(f ? f.text : "")}"><b>${esc(what)}</b>　${n} 件</span>
+    <button id="btn-clear" title="絞り込みを解除（Esc）"><span class="ic">&#x2715;</span>解除</button>
+  </div>`;
+}
+
+function setOnly(i) {
+  onlyFinding = i;
+  only = i === null ? null : data.findings[i].ids;
+  if (only) kind = "すべて";
+  renderFindings(); renderKinds(); renderList();
+}
+
+function renderList() {
+  renderViews();
+  const items = data.items.filter(matches);
+  const bar = filterBar(items.length);
+  if (!items.length) { $("#list").innerHTML = bar + '<div class="empty">該当なし</div>'; return; }
+  if (view === "table") { renderTable(items); $("#list").insertAdjacentHTML("afterbegin", bar); return; }
+  const groups = new Map();
+  items.forEach((it) => {
+    const p = it.project || "（プロジェクト不明）";
+    if (!groups.has(p)) groups.set(p, []);
+    groups.get(p).push(it);
+  });
+  const rank = (it) => (it.mark.unneeded ? 100 : 0) + KIND_ORDER.indexOf(it.label);
+  const unknown = (p) => (p.startsWith("（") ? 1 : 0);
+  const names = [...groups.keys()].sort((a, b) => unknown(a) - unknown(b) || a.localeCompare(b));
+  $("#list").innerHTML = bar + names.map((p) => {
+    const g = groups.get(p).sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+    return `<h2 class="proj">${esc(p)} <span class="tag r-unknown">${g.length}</span></h2>` + g.map(card).join("");
+  }).join("");
+}
+
+async function refresh() { data = await api("/api/list"); render(); }
+
+// Coming back to the window (after deleting or adding files in Explorer):
+// read the shelves again; the server also drops files that no longer exist.
+let lastSync = Date.now();
+async function resync() {
+  if (!data || Date.now() - lastSync < 2000) return;
+  lastSync = Date.now();
+  try { data = await api("/api/rescan", {}); render(); } catch { /* server stopped: keep the page */ }
+}
+window.addEventListener("focus", resync);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) resync(); });
+
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  try {
+    if (b.id === "btn-reload") { data = await api("/api/rescan", {}); render(); }
+    else if (b.id === "btn-search") { data = await api("/api/rescan", { repos: true }); render(); }
+    else if (b.dataset.place) {
+      place = b.dataset.place; remember("keyshelf.place", place);
+      setOnly(null);
+    }
+    else if (b.id === "btn-clear") { setOnly(null); }
+    else if (b.id === "btn-folders") {
+      foldersOpen = !foldersOpen; folderError.shelf = folderError.repo = "";
+      renderFolders(); if (foldersOpen) $("#repo-input").focus();
+    }
+    else if (b.dataset.folderAdd) { const k = b.dataset.folderAdd; await changeFolder(k, "add", $(`#${k}-input`).value); }
+    else if (b.dataset.folderRemove) { await changeFolder(b.dataset.fkind, "remove", b.dataset.folderRemove); }
+    else if (b.id === "btn-findings") {
+      findingsOpen = !findingsOpen; remember("keyshelf.findings", findingsOpen ? "open" : "closed");
+      renderFindings();
+    }
+    else if (b.dataset.view) { view = b.dataset.view; remember("keyshelf.view", view); renderList(); }
+    else if (b.dataset.sort) {
+      if (sortKey === b.dataset.sort) sortDir = -sortDir; else { sortKey = b.dataset.sort; sortDir = 1; }
+      renderList();
+    }
+    else if (b.dataset.detail) {
+      const id = b.dataset.detail;
+      if (opened.has(id)) opened.delete(id); else opened.add(id);
+      renderList();
+    }
+    else if (b.dataset.kind) { kind = b.dataset.kind; renderKinds(); renderList(); }
+    else if (b.dataset.finding) {
+      const i = +b.dataset.finding;
+      if (onlyFinding === i) { setOnly(null); return; }
+      setOnly(i);
+      const hh = $("header").offsetHeight;
+      window.scrollTo({ top: $("#list").getBoundingClientRect().top + scrollY - hh - 8, behavior: "smooth" });
+    }
+    else if (b.dataset.save) {
+      const id = b.dataset.save, it = byId.get(id);
+      const note = document.querySelector(`textarea[data-note="${id}"]`).value;
+      const m = await api("/api/note", { key: it.note_key, note });
+      data.items.filter((x) => x.note_key === it.note_key).forEach((x) => x.mark = m);
+      if (view === "table") renderList();
+      const at = view === "table" ? document.querySelector(`button[data-save="${id}"]`) : b;
+      const s = document.createElement("span"); s.className = "saved"; s.textContent = "保存済み";
+      (at || b).after(s); setTimeout(() => s.remove(), 1500);
+    }
+    else if (b.dataset.unneeded) {
+      const it = byId.get(b.dataset.unneeded);
+      const now = b.getAttribute("aria-pressed") !== "true";
+      const m = await api("/api/note", { key: it.note_key, unneeded: now });
+      data.items.filter((x) => x.note_key === it.note_key).forEach((x) => x.mark = m);
+      renderList();
+    }
+    else if (b.dataset.reveal) { await api("/api/reveal", { id: b.dataset.reveal }); }
+  } catch (err) { alert("失敗: " + err.message); }
+});
+$("#q").addEventListener("input", renderList);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && only) setOnly(null);
+  if (e.key === "Enter" && e.target.classList?.contains("folder-input")) changeFolder(e.target.dataset.fkind, "add", e.target.value);
+});
+const setHeaderHeight = () => document.documentElement.style.setProperty("--hh", $("header").offsetHeight + "px");
+window.addEventListener("resize", setHeaderHeight);
+setHeaderHeight();
+refresh();
+</script>
+</body>
+</html>
