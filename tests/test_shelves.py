@@ -54,3 +54,18 @@ def test_config_migrates_single_folder(shelf):
     store._write(store.home() / "config.json", {"folder": "C:\\old", "roots": []})
     cfg = store.load_config()
     assert cfg["shelves"] == ["C:\\old"] and "folder" not in cfg
+
+
+def test_first_run_defaults(tmp_path, monkeypatch, capsys):
+    """No config: the shelf is ~/KeyShelf (created, empty) and no author's paths leak in."""
+    from pathlib import Path
+
+    from keyshelf import cli
+
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    cfg = store.load_config()
+    assert cfg["shelves"] == [str(tmp_path / "KeyShelf")]
+    assert set(cfg["roots"]) <= {r"C:\Repos"}  # the ~/... places do not exist under tmp_path
+    assert cli.main(["list", "--no-copies"]) == 0
+    assert (tmp_path / "KeyShelf").is_dir()
+    assert not any(tmp_path.joinpath("KeyShelf").iterdir())

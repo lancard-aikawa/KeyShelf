@@ -3,6 +3,8 @@ name = "keyshelf"
 version = "0.1.0"
 description = "Read-only shelf for downloaded Google / Firebase credential files: what each one is, what it is for, duplicates and copies in repositories"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = []
 

@@ -28,10 +28,15 @@ def _write(path: Path, data) -> None:
 
 
 def default_roots() -> list[str]:
-    return [r for r in (r"C:\Repos", r"F:\Repos") if Path(r).is_dir()]
+    """Common places for repositories that exist on this machine (change them in the UI)."""
+    h = Path.home()
+    cands = [h / "source" / "repos", h / "repos", h / "src", Path(r"C:\Repos")]
+    return [str(r) for r in cands if r.is_dir()]
 
 
-DEFAULT_SHELF = r"C:\work\Firebase_json"
+def default_shelf() -> str:
+    """Created on first run when nothing else is configured."""
+    return str(Path.home() / "KeyShelf")
 
 
 def load_config() -> dict:
@@ -41,7 +46,7 @@ def load_config() -> dict:
     """
     cfg = _read(home() / "config.json", {})
     if "shelves" not in cfg:
-        cfg["shelves"] = [cfg.get("folder") or DEFAULT_SHELF]
+        cfg["shelves"] = [cfg.get("folder") or default_shelf()]
     cfg.pop("folder", None)
     cfg.setdefault("roots", default_roots())
     cfg.setdefault("port", DEFAULT_PORT)

@@ -42,12 +42,19 @@ uv run keyshelf list --no-copies # リポジトリを探さない
 uv run keyshelf list --shelf D:\keys --root D:\Repos   # 設定の代わりにフォルダを指定（くり返し可）
 ```
 
-設定は `%USERPROFILE%\.keyshelf\config.json`（無ければ既定値。画面の「フォルダ」で変えるとここに書く）。
+設定は `%USERPROFILE%\.keyshelf\config.json`（画面の「フォルダ」で変えるとここに書く）。
+無ければ既定値で動く。保管庫は `%USERPROFILE%\KeyShelf`（初回に空のフォルダを作る）、リポジトリは
+`%USERPROFILE%\source\repos`・`%USERPROFILE%\repos`・`%USERPROFILE%\src`・`C:\Repos` のうち在るもの。
 
 ```json
-{ "shelves": ["C:\\work\\Firebase_json"], "roots": ["C:\\Repos", "F:\\Repos"], "port": 20002 }
+{ "shelves": ["D:\\keys"], "roots": ["D:\\Repos"], "port": 20002 }
 ```
 
 前の版の `"folder"`（保管庫 1 つ）は、読むときに `"shelves"` に読み替える。
 
-ポート 20002 は LPortMan に登録してある。依存は Python の標準ライブラリだけ（試験に pytest）。
+Windows 向け（起動は `.cmd`、「開く」はエクスプローラ）。Python 3.11 以上と [uv](https://docs.astral.sh/uv/) が要る。
+依存は Python の標準ライブラリだけ（試験に pytest）。
+
+## ライセンス
+
+MIT（[LICENSE](LICENSE)）

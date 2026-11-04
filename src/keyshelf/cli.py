@@ -37,6 +37,11 @@ def main(argv=None) -> int:
     cfg = store.load_config()
     shelves = [Path(s) for s in (a.shelf or cfg["shelves"])]
     roots = [] if a.no_copies else [Path(r) for r in (a.root or cfg["roots"])]
+    if not a.shelf:
+        first = Path(store.default_shelf())
+        if first in shelves and not first.exists():
+            first.mkdir(parents=True)  # first run: an empty shelf to put the downloaded files in
+            print(f"created the shelf folder: {first}", file=sys.stderr)
     missing = [s for s in shelves if not s.is_dir()]
     if missing:
         print("shelf folder not found: " + ", ".join(map(str, missing)), file=sys.stderr)
